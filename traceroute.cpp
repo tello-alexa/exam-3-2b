@@ -116,12 +116,12 @@ void traceroute(char* dest) {
              * 
              */
             // send ICMP message
-            ssize_t bytes_sent = sendto(sockfd, send_buf, sizeof(send_buf), MSG_CONFIRM, (sockaddr*)&addr, sizeof(addr));
+            ssize_t bytes_sent = sendto(sockfd, send_buf, sizeof(icmpheader), MSG_CONFIRM, (sockaddr*)&addr, sizeof(addr));
             if(bytes_sent < sizeof(icmpheader)) {
                 perror("packet didn't have icmpheader");
                 exit(-1);
             }
-           
+
             // wait to check if there is data available to receive; need to retry if timeout: no need to change
             timeval tv;
             fd_set rfd;
@@ -142,15 +142,21 @@ void traceroute(char* dest) {
                 // timeout
                 cout << "* ";
 
-                // resend message
+                /* resend message
                 ssize_t bytes_sent = sendto(sockfd, send_buf, sizeof(send_buf), MSG_CONFIRM, (sockaddr*)&addr, sizeof(addr));
                 if(bytes_sent < sizeof(icmpheader)) {
                     perror("packet didn't have icmpheader");
                     exit(-1);
-                }
+                }*/
 
                 // retry
                 retry++;
+                if(retry == MAX_RETRY) {
+                    ttl++;
+                    retry = 0;
+                    break;
+                }
+                continue;
             }
             else if (ret > 0) {
                 // TODO 4.b
@@ -189,7 +195,7 @@ void traceroute(char* dest) {
                
                 // ----------------
 
-                if(bytes_read >= 2 * (sizeof(ipheader) + sizeof(icmpheader)) && bytes_read < PACKET_LEN) {
+                if(bytes_read >= 2 * (sizeof(ipheader) + sizeof(icmpheader)) && router_icmph->icmp_type != ICMP_ECHO_REPLY) {
                     // get original ICMP header from buffer
                     struct icmpheader* og_icmph = (struct icmpheader*) (recv_buf + 2*sizeof(struct ipheader) + sizeof(struct icmpheader));
                     if(router_icmph->icmp_type == ICMP_TIME_EXCEEDED && og_icmph->icmp_seq == ttl && og_icmph->icmp_id == pid) {
